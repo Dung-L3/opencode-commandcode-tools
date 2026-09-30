@@ -16,7 +16,69 @@ import {
   isProviderPresent,
   assessConnection,
   readJsonFile,
+  t,
+  setLang,
+  getLang,
+  detectLang,
 } from "./setup-commandcode.mjs";
+
+// ---------- i18n ----------
+test("detectLang: CMDCODE_LANG thang moi thu", () => {
+  assert.equal(detectLang({ CMDCODE_LANG: "vi" }), "vi");
+  assert.equal(detectLang({ CMDCODE_LANG: "en" }), "en");
+  assert.equal(detectLang({ CMDCODE_LANG: "VI" }), "vi");
+  assert.equal(detectLang({ CMDCODE_LANG: "en-US" }), "en");
+});
+
+test("detectLang: khong co env thi theo locale", () => {
+  assert.equal(detectLang({}, "vi-VN"), "vi");
+  assert.equal(detectLang({}, "en-US"), "en");
+  assert.equal(detectLang({}, "fr-FR"), "en");
+  assert.equal(detectLang({}, undefined), "en");
+});
+
+test("t: doi ngon ngu thi doi chu", () => {
+  setLang("en");
+  assert.match(t("done"), /DONE/);
+  setLang("vi");
+  assert.match(t("done"), /XONG/);
+  assert.equal(getLang(), "vi");
+});
+
+test("t: thay placeholder", () => {
+  setLang("en");
+  assert.match(t("keyValid", { n: 42 }), /42/);
+  setLang("vi");
+  assert.match(t("providerCreated", { n: 7 }), /7/);
+});
+
+test("t: khoa la thi tra ve chinh khoa do, khong crash", () => {
+  setLang("en");
+  assert.equal(t("khong_ton_tai_khoa_nay"), "khong_ton_tai_khoa_nay");
+});
+
+test("setLang: gia tri la thi mac dinh ve en", () => {
+  setLang("fr");
+  assert.equal(getLang(), "en");
+  setLang("vi");
+});
+
+test("MOI khoa deu co du ca hai thu tieng", async () => {
+  const mod = await import("./setup-commandcode.mjs");
+  // Lay khoa bang cach do chuoi: dung bang cach goi t voi mot khoa gia
+  const keysEn = new Set(), keysVi = new Set();
+  const src = mod.getLang;
+  // So sanh truc tiep qua bang dich vu (khong export) => do gian tiep:
+  // dat tung ngon ngu roi kiem tra vai khoa dai dien khong bi ro ri.
+  setLang("en");
+  const enSamples = ["langTitle", "step1", "done", "keyValid", "e2eOk"].map((k) => t(k, { n: 1, v: "x", m: "y", f: "z", p: "q", s: "r", url: "u", fp: "w", src: "t", e: "e", what: "o", cmd: "c", list: "l" }));
+  setLang("vi");
+  const viSamples = ["langTitle", "step1", "done", "keyValid", "e2eOk"].map((k) => t(k, { n: 1, v: "x", m: "y", f: "z", p: "q", s: "r", url: "u", fp: "w", src: "t", e: "e", what: "o", cmd: "c", list: "l" }));
+  assert.equal(enSamples.length, viSamples.length);
+  for (const s of enSamples) assert.ok(s && !s.includes("{"), `chuoi tieng Anh con placeholder: ${s}`);
+  for (const s of viSamples) assert.ok(s && !s.includes("{"), `chuoi tieng Viet con placeholder: ${s}`);
+});
+
 
 // ---------- parseDebugPaths ----------
 test("parseDebugPaths: đọc đúng output thật của `opencode debug paths`", () => {

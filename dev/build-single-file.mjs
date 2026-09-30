@@ -12,6 +12,10 @@
 //   - Cả hai đều tự tách phần JavaScript ở cuối file ra file tạm rồi gọi node.
 //
 // Bắt buộc: file kết quả phải dùng LF. Nếu là CRLF, sh sẽ hỏng heredoc.
+//
+// Ngôn ngữ: bootstrap hỏi chọn Anh/Việt TRƯỚC TIÊN, rồi truyền lựa chọn cho
+// não qua CMDCODE_LANG. Thông báo của chính bootstrap thì song ngữ luôn, để
+// không phải rẽ nhánh trong batch — ít chỗ sai hơn.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -23,85 +27,98 @@ const OUT = path.join(HERE, "..", "Cai-CommandCode.cmd");
 const MARKER = "#__PAYLOAD__";
 const DL = "https://nodejs.org/en/download";
 
-// Thông báo khi KHÔNG cài được Node tự động — dùng chung cho mọi nhánh thất bại
-// để người dùng luôn nhận đúng một hướng dẫn.
+// Thông báo khi KHÔNG cài được Node — song ngữ, dùng chung mọi nhánh thất bại.
 const NOTIFY_BAT = [
   "echo.",
   "echo   ==================================================",
+  "echo    CANNOT INSTALL NODE AUTOMATICALLY",
   "echo    KHONG CAI DUOC NODE TU DONG",
   "echo   ==================================================",
   "echo.",
-  "echo    Cong cu nay can Node.js de chay.",
-  "echo    Phan cai tu dong khong thanh cong.",
+  "echo    Install Node manually / Hay cai Node THU CONG:",
   "echo.",
-  "echo    Hay cai Node THU CONG:",
+  "echo      1. " + DL,
+  "echo      2. LTS build for your OS / ban LTS cho he dieu hanh cua ban",
+  "echo      3. Install it / Cai dat xong",
+  "echo      4. Run this file again / Chay lai file nay",
   "echo.",
-  "echo      1. Mo trang:  " + DL,
-  "echo      2. Tai ban LTS cho he dieu hanh cua ban",
-  "echo      3. Cai dat xong",
-  "echo      4. Chay lai file nay",
-  "echo.",
-  "echo    Node cai xong la chay duoc, khong can cau hinh gi them.",
+  "echo    Node is all you need - no extra config.",
+  "echo    Co Node la chay duoc, khong can cau hinh gi them.",
   "echo.",
 ].join("\n");
 
 const NOTIFY_SH = [
   "echo",
   'echo "  =================================================="',
+  'echo "   CANNOT INSTALL NODE AUTOMATICALLY"',
   'echo "   KHÔNG CÀI ĐƯỢC NODE TỰ ĐỘNG"',
   'echo "  =================================================="',
   "echo",
-  'echo "   Công cụ này cần Node.js để chạy."',
-  'echo "   Phần cài tự động không thành công."',
+  'echo "   Install Node manually / Hãy cài Node THỦ CÔNG:"',
   "echo",
-  'echo "   Hãy cài Node THỦ CÔNG:"',
+  'echo "     1. ' + DL + '"',
+  'echo "     2. LTS build for your OS / bản LTS cho hệ điều hành của bạn"',
+  'echo "     3. Install it / Cài đặt xong"',
+  'echo "     4. Run this file again / Chạy lại file này"',
   "echo",
-  'echo "     1. Mở trang:  ' + DL + '"',
-  'echo "     2. Tải bản LTS cho hệ điều hành của bạn"',
-  'echo "     3. Cài đặt xong"',
-  'echo "     4. Chạy lại file này"',
-  "echo",
-  'echo "   Node cài xong là chạy được, không cần cấu hình gì thêm."',
+  'echo "   Node is all you need - no extra config."',
+  'echo "   Có Node là chạy được, không cần cấu hình gì thêm."',
   "echo",
 ].join("\n");
 
 // --- Khối Windows (cmd) ---
 const BATCH = `@echo off
 setlocal EnableDelayedExpansion
+chcp 65001 >nul
 set "SELF=%~f0"
 set "PAYLOAD=%TEMP%\\cmdcode-%RANDOM%-%RANDOM%.mjs"
 
+rem ---- Chon ngon ngu / Choose language (luon o dau tien) ----
+echo.
+echo   ==================================================
+echo    Chon ngon ngu  /  Choose language
+echo   ==================================================
+echo.
+echo      [1] English
+echo      [2] Tieng Viet (Vietnamese)
+echo.
+set "CMD_LANG=1"
+set /p "CMD_LANG=  Chon / Choose: "
+rem So sanh bang ky tu dau: neu input bi pipe qua PowerShell thi gia tri co the
+rem dinh kem \r, so ca chuoi se truot.
+if "!CMD_LANG:~0,1!"=="2" (set "CMDCODE_LANG=vi") else (set "CMDCODE_LANG=en")
+echo.
+
 where node >nul 2>nul
 if errorlevel 1 (
-  echo.
-  echo   Node.js chua duoc cai tren may nay.
+  echo   Node.js is not installed. / Node.js chua duoc cai tren may nay.
   echo.
   where winget >nul 2>nul
   if errorlevel 1 (
-    echo   Khong tim thay winget tren may nay.
+    echo   winget not found. / Khong tim thay winget.
 ${NOTIFY_BAT}
     start "" "${DL}"
     pause
     exit /b 1
   )
   set "ANS="
-  set /p "ANS=  Cai Node.js LTS bang winget bay gio? (Y/n) "
+  set /p "ANS=  Install Node.js LTS with winget? / Cai bang winget? (Y/n) "
   if /i "!ANS!"=="n" (
-    echo   Da huy.
+    echo   Cancelled. / Da huy.
     pause
     exit /b 1
   )
   if /i "!ANS!"=="no" (
-    echo   Da huy.
+    echo   Cancelled. / Da huy.
     pause
     exit /b 1
   )
   echo.
-  echo   Dang cai Node.js LTS, co the mat vai phut...
+  echo   Installing Node.js LTS... / Dang cai, co the mat vai phut...
   winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
   if errorlevel 1 (
     echo.
-    echo   winget bao loi khi cai Node.
+    echo   winget reported an error. / winget bao loi khi cai Node.
     echo.
   )
   rem Node vua cai co the chua kip vao PATH cua tien trinh nay
@@ -119,7 +136,7 @@ rem Tach phan JavaScript o cuoi file ra file tam (dung PowerShell cho chac)
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$m='${MARKER}'; $t=[IO.File]::ReadAllText('%SELF%'); $i=$t.LastIndexOf($m); if($i -lt 0){ exit 1 }; [IO.File]::WriteAllText('%PAYLOAD%', $t.Substring($i + $m.Length).TrimStart(), (New-Object Text.UTF8Encoding $false))"
 if errorlevel 1 (
   echo.
-  echo   Loi: khong tach duoc phan JavaScript trong file nay.
+  echo   Cannot extract the JavaScript payload. / Khong tach duoc phan JavaScript.
   echo.
   pause
   exit /b 1
@@ -136,39 +153,59 @@ exit /b %RC%`;
 const SH = `SELF="$0"
 PAYLOAD="\${TMPDIR:-/tmp}/cmdcode-\$\$.mjs"
 
+# ---- Chon ngon ngu / Choose language (luon o dau tien) ----
+echo
+echo "  =================================================="
+echo "   Chọn ngôn ngữ  /  Choose language"
+echo "  =================================================="
+echo
+echo "     [1] English"
+echo "     [2] Tiếng Việt"
+echo
+printf "  Chọn / Choose (1/2): "
+read -r CHOICE
+# Bo \r phong khi input bi pipe tu moi truong ghi CRLF
+CHOICE=$(printf '%s' "$CHOICE" | tr -d '\r')
+case "\${CHOICE:-1}" in
+  2) CMDCODE_LANG=vi ;;
+  *) CMDCODE_LANG=en ;;
+esac
+export CMDCODE_LANG
+echo
+
 install_node() {
   if command -v brew >/dev/null 2>&1; then
-    printf "  Cài Node.js bằng Homebrew bây giờ? (Y/n) "
+    printf "  Install Node.js with Homebrew? / Cài bằng Homebrew? (Y/n) "
     read -r ans
     case "\${ans:-y}" in
-      n|N|no|NO|No) echo "  Đã huỷ."; return 1 ;;
+      n|N|no|NO|No) echo "  Cancelled. / Đã huỷ."; return 1 ;;
     esac
     brew install node || return 1
   elif command -v apt-get >/dev/null 2>&1; then
-    printf "  Cài Node.js bằng apt (cần quyền sudo)? (Y/n) "
+    printf "  Install Node.js with apt (needs sudo)? / Cài bằng apt (cần sudo)? (Y/n) "
     read -r ans
     case "\${ans:-y}" in
-      n|N|no|NO|No) echo "  Đã huỷ."; return 1 ;;
+      n|N|no|NO|No) echo "  Cancelled. / Đã huỷ."; return 1 ;;
     esac
     sudo apt-get update && sudo apt-get install -y nodejs npm || return 1
   elif command -v dnf >/dev/null 2>&1; then
-    printf "  Cài Node.js bằng dnf (cần quyền sudo)? (Y/n) "
+    printf "  Install Node.js with dnf (needs sudo)? / Cài bằng dnf (cần sudo)? (Y/n) "
     read -r ans
     case "\${ans:-y}" in
-      n|N|no|NO|No) echo "  Đã huỷ."; return 1 ;;
+      n|N|no|NO|No) echo "  Cancelled. / Đã huỷ."; return 1 ;;
     esac
     sudo dnf install -y nodejs || return 1
   elif command -v pacman >/dev/null 2>&1; then
-    printf "  Cài Node.js bằng pacman (cần quyền sudo)? (Y/n) "
+    printf "  Install Node.js with pacman (needs sudo)? / Cài bằng pacman (cần sudo)? (Y/n) "
     read -r ans
     case "\${ans:-y}" in
-      n|N|no|NO|No) echo "  Đã huỷ."; return 1 ;;
+      n|N|no|NO|No) echo "  Cancelled. / Đã huỷ."; return 1 ;;
     esac
     sudo pacman -S --noconfirm nodejs npm || return 1
   else
-    echo "  Không tìm thấy trình quản lý gói quen thuộc (brew/apt/dnf/pacman)."
+    echo "  No known package manager. / Không tìm thấy trình quản lý gói quen thuộc."
     echo
-    echo "  Hãy cài Node thủ công: ${DL}"
+    echo "  Install Node manually / Hãy cài Node thủ công: ${DL}"
     return 1
   fi
   return 0
@@ -176,7 +213,7 @@ install_node() {
 
 if ! command -v node >/dev/null 2>&1; then
   echo
-  echo "  Node.js chưa được cài trên máy này."
+  echo "  Node.js is not installed. / Node.js chưa được cài trên máy này."
   echo
 
   if ! install_node; then
@@ -184,18 +221,18 @@ ${NOTIFY_SH}
     exit 1
   fi
 
-  # Cài xong nhưng chưa chắc đã có trong PATH của phiên hiện tại
+  # Cai xong nhung chua chac da co trong PATH cua phien hien tai
   if ! command -v node >/dev/null 2>&1; then
 ${NOTIFY_SH}
     exit 1
   fi
-  echo "  Node đã cài xong: $(node --version)"
+  echo "  Node installed: $(node --version) / Node đã cài xong"
 fi
 
 LINE="$(grep -n '^${MARKER}$' "$SELF" | tail -n 1 | cut -d: -f1)"
 if [ -z "$LINE" ]; then
   echo
-  echo "  Lỗi: không tách được phần JavaScript trong file này."
+  echo "  Cannot extract the JavaScript payload. / Không tách được phần JavaScript."
   exit 1
 fi
 awk -v m="${MARKER}" 'found{print} $0==m{found=1}' "$SELF" > "$PAYLOAD"
@@ -207,24 +244,33 @@ exit "$rc"`;
 
 const brain = fs.readFileSync(SRC, "utf8");
 
-const out = [
-  ": << 'BATCH_EOF'",
-  BATCH,
-  "BATCH_EOF",
-  "",
-  SH,
-  "",
-  MARKER,
-  brain,
-].join("\n");
+// TRỘN LINE ENDING — đây là điểm mấu chốt, không phải tuỳ tiện:
+//
+//   cmd.exe đọc file batch theo BYTE OFFSET. Với file LF thuần, khi file đủ
+//   lớn và có khối if lồng nhau, cmd tính sai dòng và chạy lạc sang cả khối sh
+//   phía sau (đã gặp thật). CRLF mới đọc đúng.
+//
+//   sh thì ngược lại: không tự cắt \r, nên CRLF sẽ làm hỏng giá trị biến.
+//
+//   Nên: khối batch + dòng kết BATCH_EOF dùng CRLF; phần sh và payload dùng LF.
+//   sh bỏ qua toàn bộ khối batch qua heredoc, nên CRLF bên trong vô hại.
+//   Dòng 1 và dòng kết đều CRLF nên delimiter khớp nhau (cả hai đều là
+//   "BATCH_EOF\r" với sh).
+const batchPart = [": << 'BATCH_EOF'", BATCH, "BATCH_EOF"].join("\r\n") + "\r\n";
+const shPart = [SH, "", MARKER, brain].join("\n").replace(/\r\n/g, "\n");
+const out = batchPart + shPart;
 
-// Bắt buộc LF
-const lf = out.replace(/\r\n/g, "\n");
-fs.writeFileSync(OUT, lf, "utf8");
+fs.writeFileSync(OUT, out, "utf8");
 
-const crlf = (lf.match(/\r\n/g) || []).length;
+const body = out.slice(batchPart.length);
+const crlfInSh = (body.match(/\r\n/g) || []).length;
+const batchBlock = out.slice(0, batchPart.length);
+const nonAsciiInBatch = batchBlock.split("\n").filter((l) => /[^\x00-\x7F]/.test(l)).length;
+const markerLines = (out.match(new RegExp(`^${MARKER}$`, "gm")) || []).length;
+
 console.log(`Đã tạo: ${OUT}`);
-console.log(`  kích thước : ${fs.statSync(OUT).size} bytes`);
-console.log(`  dòng       : ${lf.split("\n").length}`);
-console.log(`  CRLF       : ${crlf} (phải là 0)`);
-console.log(`  marker     : ${(lf.match(new RegExp(`^${MARKER}$`, "gm")) || []).length} lần (phải là 1)`);
+console.log(`  kích thước      : ${fs.statSync(OUT).size} bytes`);
+console.log(`  dòng            : ${out.split("\n").length}`);
+console.log(`  CRLF trong sh   : ${crlfInSh} (phải là 0)`);
+console.log(`  dòng batch ngoài ASCII: ${nonAsciiInBatch} (phải là 0)`);
+console.log(`  marker          : ${markerLines} lần (phải là 1)`);

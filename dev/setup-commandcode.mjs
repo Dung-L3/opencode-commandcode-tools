@@ -3,11 +3,8 @@
 // KHÔNG thêm shebang vào file này: nó được nhúng làm payload trong file
 // polyglot, và ở đó shebang sẽ rơi xuống dòng 2 (Node chỉ chấp nhận ở dòng 1).
 //
-// Thường được gọi qua install.cmd (Windows) hoặc install.sh (Linux/macOS),
-// vì hai file đó lo việc bảo đảm Node đã có trước.
-//
-// Không hardcode đường dẫn: hỏi chính OpenCode nơi nó để config,
-// fallback theo quy ước XDG / homedir.
+// Song ngữ Anh/Việt. Ngôn ngữ chọn ở đầu bootstrap và truyền vào qua
+// biến môi trường CMDCODE_LANG. Chạy trực tiếp thì tự hỏi.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -24,8 +21,219 @@ const CMD_CMDC = "npm i -g command-code";
 const DEFAULT_CONTEXT = 200000;
 const DEFAULT_OUTPUT = 32000;
 const KEY_PAGE = "https://commandcode.ai/settings/keys";
-// Model rẻ, đã kiểm chứng chạy được — dùng để thử end-to-end.
 const E2E_PREFERRED = "deepseek/deepseek-v4-flash";
+
+// ============================================================
+// Song ngữ
+// ============================================================
+
+const M = {
+  en: {
+    langTitle: "Choose language",
+    langAsk: "Choose (1/2): ",
+
+    title: "COMMAND CODE  →  OPENCODE",
+    step1: "Detecting environment",
+    step2: "Checking whether OpenCode is wired to Command Code",
+    step3: "Deciding what to do",
+    step4: "Checking installations",
+    step5: "Entering API key",
+    step6: "Configuring",
+
+    nodePresent: "Node {v} is available.",
+    opencodePresent: "OpenCode {v}",
+    opencodeMissing: "OpenCode is not installed.",
+    cmdcPresent: "Command Code {v} (command: {n})",
+    cmdcMissing: "Command Code CLI is not installed.",
+    configDeclared: "OpenCode reports its config at: {p}",
+    configGuessed: "Guessed by convention: {p}",
+    configBadJson: "{f} is not valid JSON.",
+    configBadJsonHint: "Stopped so the file is not damaged. Fix it, then run again.",
+
+    providerPresent: "config has providers.cmd ({n} models).",
+    providerAbsent: "config has no providers.cmd yet.",
+    statusLabel: "Status: {s}",
+    statusReady: "connected and ready",
+    statusNotConfigured: "not configured",
+    statusKeyInvalid: "configured, but the key is invalid",
+    statusUnverified: "configured, could not verify (offline)",
+
+    alreadyConnected: "OpenCode and Command Code are already wired together — nothing to reconfigure.",
+    askRotate: "Change the API key? (y/N) ",
+    nothingToDo: "Nothing to do. You are already set up.",
+    needKeyInvalid: "The stored key does not work — enter a new one.",
+    needKeyUnverified: "The key will be checked again when there is a network.",
+    needConfig: "OpenCode needs the provider configured.",
+
+    notInstalled: "{what} is not installed.",
+    willRun: "Command to run:  {cmd}",
+    installNow: "Install now? (Y/n) ",
+    installing: "Running (this can take a few minutes)...",
+    skipInstall: "Skipping {what}.",
+    opencodeMissingFatal: "OpenCode is missing, cannot continue.",
+    installedButNotFound: "Installed, but `opencode` still not found on PATH.",
+    alreadyInstalled: "{what} is already installed — skipping.",
+    cmdcInstalledNotInPath: "Installed, but not yet on PATH (you may need to reopen the terminal).",
+    skipCli: "Skipping the CLI — OpenCode still works.",
+
+    keyPage: "Get one at: {url}",
+    keyPrompt: "Paste the key and press Enter: ",
+    keyGot: "Key received: {fp}",
+    confirmKey: "Correct? (Y/n) ",
+    keyBlank: "Nothing entered.",
+    invalidFp: "<invalid>",
+    checking: "Checking the key with Command Code...",
+    keyValid: "Key is valid — {n} models.",
+    keyInvalid: "Key is NOT valid, or the server is unreachable ({e}).",
+    nothingWritten: "Stopped. Nothing was written — your current setup is untouched.",
+    cancelled: "Cancelled.",
+    retry: "Try again.",
+    keepKey: "Keeping the existing key.",
+
+    configLine: "Config: {p} ({src})",
+    srcDeclared: "reported by opencode",
+    srcConvention: "by convention",
+    cliWritten: "CLI: key written.",
+    cliFailed: "Could not write the CLI part ({e}) — OpenCode continues anyway.",
+    backup: "Backup: {f}",
+    providerCreated: "providers.cmd created → {n} models.",
+    providerKeyOnly: "providers.cmd already existed → key updated only, model list untouched.",
+    claudeCreated: "providers.cmd-claude → {n} models.",
+
+    verifyHeader: "Verifying",
+    keyMatch: "Key matches in both providers.",
+    keyMismatch: "The written key does not match!",
+    modelsCount: "providers.cmd: {n} models.",
+    preserved: "Preserved: {list}.",
+    e2eRunning: "Running a real request through OpenCode...",
+    e2eOk: "Live request succeeded ({m}).",
+    e2eWarn: "Could not verify end-to-end (you may need to reopen OpenCode). {e}",
+
+    done: "DONE — WIRED UP",
+    configLabel: "Config : {p}",
+    backupLabel: "Backup : {p}",
+    noBackup: "(none, new file)",
+    restartHint: "Reopen OpenCode, then type /models to pick a cmd/... model.",
+    errorPrefix: "Error:",
+  },
+
+  vi: {
+    langTitle: "Chọn ngôn ngữ",
+    langAsk: "Chọn (1/2): ",
+
+    title: "COMMAND CODE  →  OPENCODE",
+    step1: "Dò môi trường",
+    step2: "Kiểm tra OpenCode đã nối với Command Code chưa",
+    step3: "Xác định việc cần làm",
+    step4: "Kiểm tra cài đặt",
+    step5: "Nhập API key",
+    step6: "Cấu hình",
+
+    nodePresent: "Node {v} đã có.",
+    opencodePresent: "OpenCode {v}",
+    opencodeMissing: "Chưa cài OpenCode.",
+    cmdcPresent: "Command Code {v} (lệnh: {n})",
+    cmdcMissing: "Chưa cài Command Code CLI.",
+    configDeclared: "OpenCode khai báo config tại: {p}",
+    configGuessed: "Đoán theo quy ước: {p}",
+    configBadJson: "{f} không phải JSON hợp lệ.",
+    configBadJsonHint: "Đã dừng để không làm hỏng file. Sửa file đó rồi chạy lại.",
+
+    providerPresent: "config có providers.cmd ({n} model).",
+    providerAbsent: "config chưa có providers.cmd.",
+    statusLabel: "Trạng thái: {s}",
+    statusReady: "đã nối sẵn sàng",
+    statusNotConfigured: "chưa cấu hình",
+    statusKeyInvalid: "có cấu hình nhưng key không hợp lệ",
+    statusUnverified: "có cấu hình, chưa kiểm tra được (offline)",
+
+    alreadyConnected: "OpenCode và Command Code đã nối với nhau — không cần cấu hình lại.",
+    askRotate: "Bạn có muốn ĐỔI key không? (y/N) ",
+    nothingToDo: "Không có gì phải làm. Bạn đã dùng được rồi.",
+    needKeyInvalid: "Key đang lưu không dùng được — cần nhập key mới.",
+    needKeyUnverified: "Sẽ kiểm tra lại key khi có mạng.",
+    needConfig: "Cần cấu hình provider cho OpenCode.",
+
+    notInstalled: "Chưa cài {what}.",
+    willRun: "Lệnh sẽ chạy:  {cmd}",
+    installNow: "Cài bây giờ? (Y/n) ",
+    installing: "Đang chạy (có thể mất vài phút)...",
+    skipInstall: "Bỏ qua cài {what}.",
+    opencodeMissingFatal: "Thiếu OpenCode, không thể tiếp tục.",
+    installedButNotFound: "Cài xong nhưng không tìm thấy `opencode` trong PATH.",
+    alreadyInstalled: "{what} đã có — bỏ qua cài đặt.",
+    cmdcInstalledNotInPath: "Cài xong nhưng chưa thấy trong PATH (có thể cần mở lại terminal).",
+    skipCli: "Bỏ qua CLI — OpenCode vẫn dùng được.",
+
+    keyPage: "Lấy tại: {url}",
+    keyPrompt: "Dán key rồi nhấn Enter: ",
+    keyGot: "Key nhận được: {fp}",
+    confirmKey: "Đúng chưa? (Y/n) ",
+    keyBlank: "Chưa nhập gì.",
+    invalidFp: "<không hợp lệ>",
+    checking: "Đang kiểm tra key với máy chủ Command Code...",
+    keyValid: "Key hợp lệ — {n} model.",
+    keyInvalid: "Key KHÔNG hợp lệ hoặc không kết nối được ({e}).",
+    nothingWritten: "Đã dừng. KHÔNG ghi gì cả — setup hiện tại vẫn nguyên vẹn.",
+    cancelled: "Đã huỷ.",
+    retry: "Nhập lại.",
+    keepKey: "Giữ nguyên key đang có.",
+
+    configLine: "Config: {p} ({src})",
+    srcDeclared: "opencode tự khai báo",
+    srcConvention: "theo quy ước",
+    cliWritten: "CLI: đã ghi key.",
+    cliFailed: "Không ghi được phần CLI ({e}) — OpenCode vẫn tiếp tục.",
+    backup: "Backup: {f}",
+    providerCreated: "providers.cmd đã tạo → {n} model.",
+    providerKeyOnly: "providers.cmd đã có → chỉ đổi key, giữ nguyên danh sách model.",
+    claudeCreated: "providers.cmd-claude → {n} model.",
+
+    verifyHeader: "Kiểm chứng",
+    keyMatch: "Key khớp ở cả 2 provider.",
+    keyMismatch: "Key ghi vào chưa khớp!",
+    modelsCount: "providers.cmd: {n} model.",
+    preserved: "Giữ nguyên: {list}.",
+    e2eRunning: "Đang thử thật một request qua OpenCode...",
+    e2eOk: "Thử thật thành công ({m}).",
+    e2eWarn: "Chưa thử được end-to-end (có thể cần mở lại OpenCode). {e}",
+
+    done: "XONG — ĐÃ NỐI XONG",
+    configLabel: "Config : {p}",
+    backupLabel: "Backup : {p}",
+    noBackup: "(chưa có, file mới)",
+    restartHint: "Mở lại OpenCode, rồi gõ /models để chọn model cmd/...",
+    errorPrefix: "Lỗi:",
+  },
+};
+
+let LANG = "en";
+
+/** Dịch một khoá, thay {placeholder}. Thiếu khoá thì rơi về tiếng Anh. */
+export function t(key, vars) {
+  let s = M[LANG]?.[key] ?? M.en[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  }
+  return s;
+}
+
+export function setLang(l) {
+  LANG = l === "vi" ? "vi" : "en";
+  return LANG;
+}
+
+export function getLang() {
+  return LANG;
+}
+
+export function detectLang(env = process.env, locale) {
+  const e = String(env.CMDCODE_LANG || "").toLowerCase();
+  if (e.startsWith("vi")) return "vi";
+  if (e.startsWith("en")) return "en";
+  const loc = String(locale || "").toLowerCase();
+  return loc.startsWith("vi") ? "vi" : "en";
+}
 
 // ============================================================
 // Logic thuần (được test trong setup-commandcode.test.mjs)
@@ -162,7 +370,7 @@ function pipedAsk(question) {
   }
   process.stdout.write(question);
   const a = (pipedLines.shift() ?? "").trim();
-  process.stdout.write("<đã nhập>\n");
+  process.stdout.write("<input>\n");
   return Promise.resolve(a);
 }
 
@@ -196,11 +404,11 @@ const askHidden = (q) => (isTTY() ? ttyAsk(q, true) : pipedAsk(q));
 const askYes = async (q, def = false) => {
   const a = await ask(q);
   if (!a) return def;
-  return /^(y|yes|có|co)$/i.test(a);
+  return /^(y|yes|có|co|v)$/i.test(a);
 };
 
 const fingerprint = (k) =>
-  !k || k.length < 20 ? "<không hợp lệ>" : `${k.slice(0, 10)}…${k.slice(-6)}  (${k.length} ký tự)`;
+  !k || k.length < 20 ? t("invalidFp") : `${k.slice(0, 10)}…${k.slice(-6)}  (${k.length})`;
 
 async function fetchModels(apiKey) {
   const res = await fetch(`${API_BASE}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
@@ -224,20 +432,38 @@ export function readJsonFile(file) {
 
 function readConfigIfAny(file) {
   if (!fs.existsSync(file)) return {};
-  try { return readJsonFile(file); } catch { return null; } // null = hỏng
+  try { return readJsonFile(file); } catch { return null; }
 }
 
 async function installWithConfirm(what, cmd) {
   say();
-  warn(`Chưa cài ${what}.`);
-  say(`      Lệnh sẽ chạy:  ${C.cyan}${cmd}${C.reset}`);
-  if (!(await askYes("      Cài bây giờ? (Y/n) ", true))) {
-    warn(`Bỏ qua cài ${what}.`);
+  warn(t("notInstalled", { what }));
+  say(`      ${t("willRun", { cmd: "" })}${C.cyan}${cmd}${C.reset}`);
+  if (!(await askYes("      " + t("installNow"), true))) {
+    warn(t("skipInstall", { what }));
     return false;
   }
-  say("      Đang chạy (có thể mất vài phút)...");
+  say("      " + t("installing"));
   const r = tryRun(cmd, { stdio: "inherit" });
   return r.ok;
+}
+
+async function chooseLanguage() {
+  const fromEnv = detectLang(process.env, null);
+  if (String(process.env.CMDCODE_LANG || "").length > 0) {
+    setLang(fromEnv);
+    return;
+  }
+  say();
+  say(`${C.cyan}${C.bold}==================================================${C.reset}`);
+  say(`${C.cyan}${C.bold}   ${M.en.langTitle}  /  ${M.vi.langTitle}${C.reset}`);
+  say(`${C.cyan}${C.bold}==================================================${C.reset}`);
+  say();
+  say("     [1] English");
+  say("     [2] Tiếng Việt");
+  say();
+  const a = await ask("  " + M.en.langAsk);
+  setLang(a === "2" ? "vi" : "en");
 }
 
 // ============================================================
@@ -245,34 +471,34 @@ async function installWithConfirm(what, cmd) {
 // ============================================================
 
 async function main() {
-  const t = { showFooter: false };
+  await chooseLanguage();
 
   say();
   say(`${C.cyan}${C.bold}==================================================${C.reset}`);
-  say(`${C.cyan}${C.bold}   COMMAND CODE  →  OPENCODE${C.reset}`);
+  say(`${C.cyan}${C.bold}   ${t("title")}${C.reset}`);
   say(`${C.cyan}${C.bold}==================================================${C.reset}`);
 
   // ---------- 1. Dò môi trường ----------
   say();
-  step("1/6", "Dò môi trường");
+  step("1/6", t("step1"));
 
-  ok(`Node ${process.version} đã có.`);
+  ok(t("nodePresent", { v: process.version }));
 
   let opencode = findTool(["opencode"]);
-  opencode ? ok(`OpenCode ${opencode.version}`) : warn("Chưa cài OpenCode.");
+  opencode ? ok(t("opencodePresent", { v: opencode.version })) : warn(t("opencodeMissing"));
 
   let cmdc = findTool(["cmdc", "command-code", "cmd"]);
-  cmdc ? ok(`Command Code ${cmdc.version} (${cmdc.name})`) : warn("Chưa cài Command Code CLI.");
+  cmdc ? ok(t("cmdcPresent", { v: cmdc.version, n: cmdc.name })) : warn(t("cmdcMissing"));
 
   const discoverConfigDir = () => {
     if (opencode) {
       const r = tryRun("opencode debug paths");
       if (r.ok) {
         const p = parseDebugPaths(r.out);
-        if (p.config) return { dir: p.config, source: "opencode tự khai báo" };
+        if (p.config) return { dir: p.config, src: t("srcDeclared") };
       }
     }
-    return { dir: resolveConfigDir({ env: process.env, homedir: os.homedir() }), source: "theo quy ước" };
+    return { dir: resolveConfigDir({ env: process.env, homedir: os.homedir() }), src: t("srcConvention") };
   };
 
   let cfgInfo = discoverConfigDir();
@@ -281,14 +507,14 @@ async function main() {
 
   if (existing === null) {
     say();
-    bad(`${configFileEarly} không phải JSON hợp lệ.`);
-    warn("Đã dừng để không làm hỏng file. Sửa file đó rồi chạy lại.");
+    bad(t("configBadJson", { f: configFileEarly }));
+    warn(t("configBadJsonHint"));
     process.exit(1);
   }
 
   // ---------- 2. Đánh giá kết nối ----------
   say();
-  step("2/6", "Kiểm tra OpenCode đã nối với Command Code chưa");
+  step("2/6", t("step2"));
 
   const storedKey = existing?.providers?.cmd?.settings?.apiKey;
   let keyValid = null;
@@ -297,122 +523,118 @@ async function main() {
     catch { keyValid = false; }
   }
 
-  let status = assessConnection(existing, keyValid);
+  const status = assessConnection(existing, keyValid);
   const STATUS_TEXT = {
-    ready: "đã nối sẵn sàng",
-    "not-configured": "chưa cấu hình",
-    "key-invalid": "có cấu hình nhưng key không hợp lệ",
-    "configured-unverified": "có cấu hình, chưa kiểm tra được (offline)",
+    ready: t("statusReady"),
+    "not-configured": t("statusNotConfigured"),
+    "key-invalid": t("statusKeyInvalid"),
+    "configured-unverified": t("statusUnverified"),
   };
 
-  if (existing?.providers?.cmd) ok(`providers.cmd có trong config (${Object.keys(existing.providers.cmd.models || {}).length} model).`);
-  else warn(`providers.cmd chưa có trong config.`);
-  say(`      Trạng thái: ${C.bold}${STATUS_TEXT[status]}${C.reset}`);
+  if (existing?.providers?.cmd) ok(t("providerPresent", { n: Object.keys(existing.providers.cmd.models || {}).length }));
+  else warn(t("providerAbsent"));
+  say(`      ${t("statusLabel", { s: `${C.bold}${STATUS_TEXT[status]}${C.reset}` })}`);
 
-  // ---------- 3. Quyết định có cần key mới không ----------
+  // ---------- 3. Quyết định ----------
   say();
-  step("3/6", "Xác định việc cần làm");
+  step("3/6", t("step3"));
 
   let key = null;
   let needConfig = false;
 
   if (status === "ready") {
-    ok("OpenCode và Command Code đã nối với nhau — không cần cấu hình lại.");
-    const rotate = await askYes("      Bạn có muốn ĐỔI key không? (y/N) ", false);
-    if (rotate) { needConfig = true; }
-    else {
+    ok(t("alreadyConnected"));
+    if (await askYes("      " + t("askRotate"), false)) {
+      needConfig = true;
+    } else {
       say();
-      say(`${C.green}${C.bold}Không có gì phải làm. Bạn đã dùng được rồi.${C.reset}`);
+      say(`${C.green}${C.bold}${t("nothingToDo")}${C.reset}`);
       return;
     }
   } else {
     needConfig = true;
-    if (status === "key-invalid") warn("Key đang lưu không dùng được — cần nhập key mới.");
-    if (status === "configured-unverified") say("      Sẽ kiểm tra lại key khi có mạng.");
-    if (status === "not-configured") say("      Cần cấu hình provider cho OpenCode.");
+    if (status === "key-invalid") warn(t("needKeyInvalid"));
+    if (status === "configured-unverified") say("      " + t("needKeyUnverified"));
+    if (status === "not-configured") say("      " + t("needConfig"));
   }
 
   // ---------- 4. Cài nếu thiếu ----------
   say();
-  step("4/6", "Kiểm tra cài đặt");
+  step("4/6", t("step4"));
 
   if (!opencode) {
     if (!(await installWithConfirm("OpenCode", CMD_OPENCODE))) {
-      bad("Thiếu OpenCode, không thể tiếp tục."); process.exit(1);
+      bad(t("opencodeMissingFatal")); process.exit(1);
     }
     opencode = findTool(["opencode"]);
-    if (!opencode) { bad("Cài xong nhưng không tìm thấy `opencode` trong PATH."); process.exit(1); }
-    ok(`OpenCode ${opencode.version}`);
+    if (!opencode) { bad(t("installedButNotFound")); process.exit(1); }
+    ok(t("opencodePresent", { v: opencode.version }));
     cfgInfo = discoverConfigDir();
-  } else ok("OpenCode đã có — bỏ qua cài đặt.");
+  } else ok(t("alreadyInstalled", { what: "OpenCode" }));
 
   if (!cmdc) {
     if (await installWithConfirm("Command Code CLI", CMD_CMDC)) {
       cmdc = findTool(["cmdc", "command-code", "cmd"]);
-      cmdc ? ok(`Command Code ${cmdc.version}`) : warn("Cài xong nhưng chưa thấy trong PATH (có thể cần mở lại terminal).");
-    } else warn("Bỏ qua CLI — OpenCode vẫn dùng được.");
-  } else ok("Command Code đã có — bỏ qua cài đặt.");
+      cmdc ? ok(t("cmdcPresent", { v: cmdc.version, n: cmdc.name })) : warn(t("cmdcInstalledNotInPath"));
+    } else warn(t("skipCli"));
+  } else ok(t("alreadyInstalled", { what: "Command Code" }));
 
-  // ---------- 5. Nhập key nếu cần ----------
+  // ---------- 5. Nhập key ----------
   if (needConfig) {
     say();
-    step("5/6", "Nhập API key");
-    say(`${C.dim}      Lấy tại: ${KEY_PAGE}${C.reset}`);
+    step("5/6", t("step5"));
+    say(`${C.dim}      ${t("keyPage", { url: KEY_PAGE })}${C.reset}`);
     while (true) {
-      key = (await askHidden("      Dán key rồi nhấn Enter: ")).trim();
-      if (!key) { bad("Chưa nhập gì."); process.exit(1); }
-      say(`      Key nhận được: ${C.yellow}${fingerprint(key)}${C.reset}`);
-      if (await askYes("      Đúng chưa? (Y/n) ", true)) break;
-
-      // Cho nhập lại nếu chưa đúng, trừ khi không phải terminal
-      if (!isTTY()) { bad("Đã huỷ."); process.exit(0); }
-      warn("Nhập lại.");
+      key = (await askHidden("      " + t("keyPrompt"))).trim();
+      if (!key) { bad(t("keyBlank")); process.exit(1); }
+      say(`      ${t("keyGot", { fp: `${C.yellow}${fingerprint(key)}${C.reset}` })}`);
+      if (await askYes("      " + t("confirmKey"), true)) break;
+      if (!isTTY()) { bad(t("cancelled")); process.exit(0); }
+      warn(t("retry"));
     }
 
     say();
-    say("      Đang kiểm tra key với máy chủ Command Code...");
+    say("      " + t("checking"));
     try {
       const n = (await fetchModels(key)).length;
-      ok(`Key hợp lệ — ${n} model.`);
+      ok(t("keyValid", { n }));
       keyValid = true;
     } catch (e) {
-      bad(`Key KHÔNG hợp lệ hoặc không kết nối được (${e.message}).`);
-      warn("Đã dừng. KHÔNG ghi gì cả — setup hiện tại vẫn nguyên vẹn.");
+      bad(t("keyInvalid", { e: e.message }));
+      warn(t("nothingWritten"));
       process.exit(1);
     }
   } else {
     say();
-    step("5/6", "API key");
-    ok("Giữ nguyên key đang có.");
+    step("5/6", t("step5"));
+    ok(t("keepKey"));
     key = storedKey;
   }
 
   // ---------- 6. Ghi cấu hình ----------
   say();
-  step("6/6", "Cấu hình");
+  step("6/6", t("step6"));
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const configDir = cfgInfo.dir;
   const configFile = path.join(configDir, "opencode.json");
   const cliAuthFile = path.join(os.homedir(), ".commandcode", "auth.json");
-  say(`${C.dim}      Config: ${configFile} (${cfgInfo.source})${C.reset}`);
+  say(`${C.dim}      ${t("configLine", { p: configFile, src: cfgInfo.src })}${C.reset}`);
 
-  // 6a. CLI
   try {
     fs.mkdirSync(path.dirname(cliAuthFile), { recursive: true });
     if (fs.existsSync(cliAuthFile)) fs.copyFileSync(cliAuthFile, `${cliAuthFile}.bak-${stamp}`);
     const a = fs.existsSync(cliAuthFile) ? readJsonFile(cliAuthFile) : {};
     a.apiKey = key;
     writeAtomic(cliAuthFile, JSON.stringify(a, null, 2));
-    ok(`CLI: đã ghi key.`);
+    ok(t("cliWritten"));
   } catch (e) {
-    warn(`Không ghi được phần CLI (${e.message}) — OpenCode vẫn tiếp tục.`);
+    warn(t("cliFailed", { e: e.message }));
   }
 
-  // 6b. OpenCode
   fs.mkdirSync(configDir, { recursive: true });
   if (fs.existsSync(configFile)) {
     fs.copyFileSync(configFile, `${configFile}.bak-${stamp}`);
-    ok(`Backup: ${path.basename(configFile)}.bak-${stamp}`);
+    ok(t("backup", { f: path.basename(configFile) + `.bak-${stamp}` }));
   }
 
   const models = await fetchModels(key);
@@ -433,48 +655,47 @@ async function main() {
   writeAtomic(configFile, JSON.stringify(merged, null, 2) + "\n");
 
   hadCmd
-    ? ok("providers.cmd đã có → chỉ đổi key, giữ nguyên danh sách model.")
-    : ok(`providers.cmd đã tạo → ${openaiCapable.length} model.`);
-  ok(`providers.cmd-claude → ${anthropicOnly.length} model.`);
+    ? ok(t("providerKeyOnly"))
+    : ok(t("providerCreated", { n: openaiCapable.length }));
+  ok(t("claudeCreated", { n: anthropicOnly.length }));
 
   // ---------- Kiểm chứng ----------
   say();
-  say(`${C.cyan}Kiểm chứng${C.reset}`);
+  say(`${C.cyan}${t("verifyHeader")}${C.reset}`);
   const after = readJsonFile(configFile);
-  const keyOk = after.providers?.cmd?.settings?.apiKey === key
+  const bothKeysOk = after.providers?.cmd?.settings?.apiKey === key
     && after.providers?.["cmd-claude"]?.settings?.apiKey === key;
-  keyOk ? ok("Key khớp ở cả 2 provider.") : bad("Key ghi vào chưa khớp!");
-  ok(`providers.cmd: ${Object.keys(after.providers?.cmd?.models || {}).length} model.`);
+  bothKeysOk ? ok(t("keyMatch")) : bad(t("keyMismatch"));
+  ok(t("modelsCount", { n: Object.keys(after.providers?.cmd?.models || {}).length }));
   const kept = ["plugins", "mcp", "agents"].filter((k) => after[k]);
-  if (kept.length) ok(`Giữ nguyên: ${kept.join(", ")}.`);
+  if (kept.length) ok(t("preserved", { list: kept.join(", ") }));
 
-  // Thử thật một request qua OpenCode
   const e2eModel = after.providers?.cmd?.models?.[E2E_PREFERRED]
     ? E2E_PREFERRED
     : Object.keys(after.providers?.cmd?.models || {})[0];
   if (e2eModel && opencode) {
-    say("      Đang thử thật một request qua OpenCode...");
+    say("      " + t("e2eRunning"));
     const r = tryRun(`opencode run --model cmd/${e2eModel} "Reply with exactly: PONG"`);
-    if (r.ok && /PONG/i.test(r.out)) ok(`Thử thật thành công (cmd/${e2eModel}).`);
-    else warn(`Chưa thử được end-to-end (có thể cần mở lại OpenCode). ${r.out.split(/\r?\n/).slice(-1)[0] || ""}`);
+    if (r.ok && /PONG/i.test(r.out)) ok(t("e2eOk", { m: `cmd/${e2eModel}` }));
+    else warn(t("e2eWarn", { e: r.out.split(/\r?\n/).slice(-1)[0] || "" }));
   }
 
-  t.showFooter = true;
   say();
   say(`${C.green}${C.bold}==================================================${C.reset}`);
-  say(`${C.green}${C.bold}   XONG — ĐÃ NỐI XONG${C.reset}`);
+  say(`${C.green}${C.bold}   ${t("done")}${C.reset}`);
   say(`${C.green}${C.bold}==================================================${C.reset}`);
-  say(`  Config : ${configFile}`);
-  say(`  Backup : ${fs.existsSync(`${configFile}.bak-${stamp}`) ? `${configFile}.bak-${stamp}` : "(chưa có, file mới)"}`);
+  say("  " + t("configLabel", { p: configFile }));
+  const bk = `${configFile}.bak-${stamp}`;
+  say("  " + t("backupLabel", { p: fs.existsSync(bk) ? bk : t("noBackup") }));
   say();
-  say(`  ${C.yellow}Mở lại OpenCode, rồi gõ /models để chọn model cmd/...${C.reset}`);
+  say(`  ${C.yellow}${t("restartHint")}${C.reset}`);
   say();
 }
 
 const isDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirect) {
   main()
-    .catch((e) => { console.error(`${C.red}Lỗi:${C.reset} ${e.message}`); process.exitCode = 1; })
+    .catch((e) => { console.error(`${C.red}${M[LANG]?.errorPrefix ?? M.en.errorPrefix}${C.reset} ${e.message}`); process.exitCode = 1; })
     .finally(() => {
       // readline giữ event loop sống: không đóng thì Node treo, không bao giờ thoát.
       if (rlTTY) { try { rlTTY.close(); } catch { /* đã đóng */ } }

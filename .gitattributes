@@ -1,2 +1,9 @@
-* text=auto eol=lf
+# Cai-CommandCode.cmd dùng line ending HỖN HỢP có chủ đích:
+#   - khối batch  : CRLF  (cmd.exe đọc theo byte offset, LF làm nó lệch dòng
+#                         và chạy lạc sang cả khối sh phía sau)
+#   - phần sh     : LF    (sh không tự cắt \r, CRLF sẽ làm hỏng giá trị biến)
+# Git phải lưu file này NGUYÊN BYTE, không được đổi line ending khi clone.
+Cai-CommandCode.cmd binary
 
+# Còn lại đều LF cho nhất quán.
+* text=auto eol=lf

@@ -1,29 +1,158 @@
 # opencode-commandcode-tools
 
-Bộ cài **Command Code → OpenCode**, chỉ gồm **một file duy nhất** để gửi sang máy khác.
+**[English](#english) · [Tiếng Việt](#tiếng-việt)**
 
-Công cụ tự phát hiện và cấu hình provider Command Code cho OpenCode: lấy danh sách model
-từ API, ghi vào `opencode.json` của OpenCode, giữ nguyên mọi thứ khác (plugins, MCP, agents).
+One file that wires **Command Code** up as a provider for **OpenCode**.
+Một file để nối **Command Code** thành provider cho **OpenCode**.
 
 ---
 
-## Dùng
+<a id="english"></a>
 
-Gửi **một file** `Cai-CommandCode.cmd` sang máy đích. Không cần gửi gì kèm theo.
+## English
+
+### What it is
+
+A single-file installer that configures Command Code as a provider for OpenCode.
+It fetches the model list from the API, writes the provider config, and **preserves
+everything else** in your OpenCode config (plugins, MCP servers, agents).
+
+### Usage
+
+Send **one file** — `Cai-CommandCode.cmd` — to the target machine. Nothing else needed.
+
+| OS | How to run |
+|---|---|
+| **Windows** | Double-click it |
+| **Linux / macOS** | `sh Cai-CommandCode.cmd` |
+
+The first thing it asks is the language: **English or Vietnamese**.
+
+If Node.js is missing, it asks before installing. If the install fails, it prints
+manual instructions with a download link.
+
+When it finishes, reopen OpenCode and type `/models` to pick a `cmd/...` model.
+
+### One file, two operating systems
+
+The file is a **polyglot** — the same file, but each OS reads a different part.
+
+The first line is:
+
+```
+: << 'BATCH_EOF'
+```
+
+- **sh** reads this as an empty heredoc → skips the whole batch block, runs the sh part
+- **cmd** reads this as a label → skips the line, runs the batch block below
+
+Each then extracts the JavaScript at the end of the file into a temp file and runs
+`node` on it. The file contains, in order:
+
+1. Windows bootstrap (batch)
+2. Linux/macOS bootstrap (sh)
+3. Marker `#__PAYLOAD__`
+4. The JavaScript
+
+**Line endings are deliberately mixed**: CRLF for the batch block, LF for the sh
+part. `cmd.exe` reads batch files by byte offset and mis-seeks on a large LF-only
+file with nested blocks — it ends up running the sh block too. `sh` is the opposite:
+it does not strip `\r`, so CRLF would corrupt variable values. The
+`.gitattributes` marks the file `binary` so git never rewrites it.
+
+### Security
+
+**The file contains no API key.** It only *writes* a key to local config, never
+*contains* one. Keys go to:
+
+- `~/.commandcode/auth.json` — for the Command Code CLI
+- `~/.config/opencode/opencode.json` → `providers.cmd.settings.apiKey` — for OpenCode
+
+Before writing anything, the tool **validates the key against the Command Code
+server**. A bad key stops it immediately with nothing written — there is no way to
+lock yourself out of a working setup.
+
+### What it does
+
+1. Detects the environment: Node, OpenCode, Command Code
+2. Finds the config directory by **asking OpenCode itself** (`opencode debug paths`)
+   — no hardcoded paths. Fallback: `$XDG_CONFIG_HOME` → `~/.config`
+3. Checks whether OpenCode is already wired to Command Code:
+   - no provider → configure it
+   - provider but a broken key → ask for a new key
+   - already working → offer to rotate the key
+4. Missing OpenCode / Command Code → prints the command, asks, then installs
+5. Fetches models from the API and splits them by route:
+   - `/chat/completions` + `/responses` → provider `cmd` (openai-compatible)
+   - `/messages` → provider `cmd-claude` (anthropic)
+6. Writes config **atomically** (temp file then rename), with a timestamped backup
+7. Verifies by running a real request through OpenCode
+
+Step 7 matters: a config that *looks* valid can still be broken. Only a real request
+catches that.
+
+Idempotent by design: if the `cmd` provider already exists, it **only updates the
+key** and leaves the model list alone.
+
+### Development
+
+The source lives in `dev/`. `Cai-CommandCode.cmd` at the root is **generated** — do
+not edit it by hand.
+
+```bash
+cd dev
+node --test setup-commandcode.test.mjs    # 29 tests
+node build-single-file.mjs                # regenerate ../Cai-CommandCode.cmd
+```
+
+Change the logic in `dev/setup-commandcode.mjs`, then run `build-single-file.mjs` to
+regenerate the polyglot. Skipping the build means your change never reaches the
+released file.
+
+Translations live in the `M` object at the top of `setup-commandcode.mjs` — both
+`en` and `vi` must have the same keys.
+
+### Known limitations
+
+- **macOS has not been tested.** It ships bash 3.2 and BSD `sed`/`awk`/`tail`,
+  which differ from GNU.
+- **The "install Node succeeded, then continue" path has never actually run.**
+  WSL1 cannot execute Node ≥18 (`Exec format error`) — a WSL1 limitation, not a
+  bug in this tool.
+
+### License
+
+No license chosen. All rights reserved.
+
+---
+
+<a id="tiếng-việt"></a>
+
+## Tiếng Việt
+
+### Đây là gì
+
+Bộ cài một file, cấu hình Command Code thành provider cho OpenCode. Nó lấy danh sách
+model từ API, ghi cấu hình provider, và **giữ nguyên mọi thứ khác** trong config
+OpenCode của bạn (plugins, MCP servers, agents).
+
+### Dùng
+
+Gửi **một file** — `Cai-CommandCode.cmd` — sang máy đích. Không cần gì kèm theo.
 
 | Hệ điều hành | Cách chạy |
 |---|---|
 | **Windows** | Nhấp đúp |
 | **Linux / macOS** | `sh Cai-CommandCode.cmd` |
 
-Nếu máy chưa có Node.js, công cụ sẽ hỏi trước khi tự cài. Nếu cài không được, nó in
-hướng dẫn cài thủ công kèm link tải.
+Việc đầu tiên nó hỏi là ngôn ngữ: **English hoặc Tiếng Việt**.
 
-Sau khi xong, mở lại OpenCode rồi gõ `/models` để chọn model `cmd/...`.
+Nếu máy chưa có Node.js, nó hỏi trước khi cài. Nếu cài thất bại, nó in hướng dẫn
+cài thủ công kèm link tải.
 
----
+Xong rồi thì mở lại OpenCode và gõ `/models` để chọn model `cmd/...`.
 
-## Một file chạy được cả hai hệ điều hành?
+### Một file, hai hệ điều hành
 
 File này là **polyglot** — cùng một file, mỗi hệ điều hành đọc một phần khác nhau.
 
@@ -34,41 +163,38 @@ Dòng đầu tiên:
 ```
 
 - **sh** hiểu là heredoc rỗng → bỏ qua toàn bộ khối batch, chạy tiếp phần sh
-- **cmd** hiểu là label → bỏ qua dòng đó, chạy thẳng khối batch
+- **cmd** hiểu là label → bỏ qua dòng đó, chạy thẳng khối batch bên dưới
 
-Cả hai sau đó tự tách phần JavaScript ở cuối file ra file tạm rồi gọi `node`.
+Cả hai sau đó tách phần JavaScript ở cuối file ra file tạm rồi gọi `node`. Cấu trúc
+file, theo thứ tự:
 
-Cấu trúc file, theo thứ tự:
-
-1. Khối bootstrap Windows (batch)
-2. Khối bootstrap Linux/macOS (sh)
+1. Bootstrap Windows (batch)
+2. Bootstrap Linux/macOS (sh)
 3. Marker `#__PAYLOAD__`
 4. Toàn bộ JavaScript
 
-Bắt buộc: file phải dùng **LF**. Nếu là CRLF, sh sẽ hỏng heredoc.
+**Line ending cố ý trộn**: CRLF cho khối batch, LF cho phần sh. `cmd.exe` đọc file
+batch theo byte offset và tính sai dòng khi file LF thuần đủ lớn có khối lồng nhau —
+nó chạy lạc sang cả khối sh. `sh` thì ngược lại: không tự cắt `\r`, nên CRLF sẽ làm
+hỏng giá trị biến. `.gitattributes` đánh dấu file là `binary` để git không bao giờ
+ghi đè.
 
----
+### An toàn
 
-## An toàn
-
-**Trong file không có API key.** Công cụ chỉ *ghi* key vào config của máy, không *chứa* key.
-
-Key được lưu vào:
+**Trong file không có API key.** Nó chỉ *ghi* key vào config cục bộ, không bao giờ
+*chứa* key. Key được lưu vào:
 
 - `~/.commandcode/auth.json` — cho Command Code CLI
 - `~/.config/opencode/opencode.json` → `providers.cmd.settings.apiKey` — cho OpenCode
 
-Cả hai đều là file cục bộ, không thuộc repo này.
+Trước khi ghi bất cứ thứ gì, công cụ **kiểm tra key với máy chủ Command Code**. Key
+sai thì dừng ngay và không ghi gì — không có tình huống tự khoá mình khỏi setup đang
+chạy tốt.
 
-Trước khi ghi bất cứ thứ gì, công cụ **kiểm tra key với máy chủ Command Code**. Key sai thì
-dừng ngay và không ghi gì — không có tình huống tự khoá mình khỏi setup đang chạy tốt.
-
----
-
-## Công cụ làm gì
+### Công cụ làm gì
 
 1. Dò môi trường: Node, OpenCode, Command Code
-2. Xác định thư mục config bằng cách **hỏi chính OpenCode** (`opencode debug paths`),
+2. Tìm thư mục config bằng cách **hỏi chính OpenCode** (`opencode debug paths`) —
    không hardcode đường dẫn. Dự phòng: `$XDG_CONFIG_HOME` → `~/.config`
 3. Kiểm tra xem OpenCode đã nối với Command Code chưa:
    - chưa có provider → cấu hình
@@ -76,58 +202,40 @@ dừng ngay và không ghi gì — không có tình huống tự khoá mình kh�
    - đã nối sẵn sàng → hỏi có muốn đổi key không
 4. Thiếu OpenCode / Command Code → in lệnh, hỏi xác nhận, rồi cài
 5. Lấy danh sách model từ API, chia theo route:
-   - `/chat/completions` + `/responses` → provider `cmd` (package openai-compatible)
-   - `/messages` → provider `cmd-claude` (package anthropic)
+   - `/chat/completions` + `/responses` → provider `cmd` (openai-compatible)
+   - `/messages` → provider `cmd-claude` (anthropic)
 6. Ghi config **nguyên tử** (file tạm rồi rename), có backup kèm timestamp
-7. Kiểm chứng: chạy thử một request thật qua OpenCode
+7. Kiểm chứng bằng cách chạy thật một request qua OpenCode
 
-Bước 7 quan trọng — config trông hợp lệ vẫn có thể hỏng thật. Chỉ request thật mới bắt được.
+Bước 7 quan trọng: config trông hợp lệ vẫn có thể hỏng thật. Chỉ request thật mới bắt
+được.
 
-Quy tắc idempotent: nếu provider `cmd` đã tồn tại thì **chỉ đổi key**, giữ nguyên danh sách model.
+Idempotent: nếu provider `cmd` đã tồn tại thì **chỉ đổi key**, giữ nguyên danh sách
+model.
 
----
+### Phát triển
 
-## Phát triển
-
-Nguồn nằm trong `dev/`. File `Cai-CommandCode.cmd` ở gốc là **file sinh ra**, không sửa tay.
+Nguồn nằm trong `dev/`. File `Cai-CommandCode.cmd` ở gốc là **file sinh ra**, không
+sửa tay.
 
 ```bash
 cd dev
-node --test setup-commandcode.test.mjs    # 22 test
+node --test setup-commandcode.test.mjs    # 29 test
 node build-single-file.mjs                # sinh lại ../Cai-CommandCode.cmd
 ```
 
-Sửa logic thì sửa `dev/setup-commandcode.mjs`, rồi chạy `build-single-file.mjs` để sinh lại
-file polyglot. Nếu không chạy build, thay đổi sẽ không vào file phát hành.
+Sửa logic trong `dev/setup-commandcode.mjs`, rồi chạy `build-single-file.mjs` để sinh
+lại file polyglot. Không chạy build thì thay đổi không vào file phát hành.
 
-### Vì sao cần bước build
-
-JavaScript phải nằm trong file polyglot, mà file polyglot phải có LF và đúng cấu trúc.
-Build script lo việc gộp và kiểm tra (CRLF = 0, marker xuất hiện đúng 1 lần).
+Bản dịch nằm trong object `M` ở đầu `setup-commandcode.mjs` — cả `en` và `vi` phải có
+đủ cùng số khoá.
 
 ### Giới hạn đã biết
 
-- Chưa test được trên **macOS thật** (dùng bash 3.2 và `sed`/`awk`/`tail` bản BSD, khác GNU)
-- Nhánh **cài Node thành công rồi chạy tiếp** chưa chạy thật lần nào
-  (WSL1 không chạy nổi Node ≥18 — `Exec format error`, là hạn chế của WSL1)
+- **Chưa test trên macOS.** macOS dùng bash 3.2 và `sed`/`awk`/`tail` bản BSD, khác GNU.
+- **Nhánh "cài Node thành công rồi chạy tiếp" chưa từng chạy thật.** WSL1 không chạy
+  nổi Node ≥18 (`Exec format error`) — hạn chế của WSL1, không phải lỗi công cụ này.
 
----
-
-## Giấy phép
+### Giấy phép
 
 Chưa chọn giấy phép. Mọi quyền được bảo lưu.
-
----
-
-## English summary
-
-A single-file installer that wires **Command Code** up as a provider for **OpenCode**.
-
-One file, `Cai-CommandCode.cmd`, runs on both Windows (double-click) and Linux/macOS (`sh`).
-It detects whether Node.js, OpenCode and Command Code are present, installs what is missing
-after asking, discovers OpenCode's config directory by asking OpenCode itself (no hardcoded
-paths), then writes the provider config while preserving everything else.
-
-No API key is contained in the file — it is only ever written to local config. A real request
-is run at the end to verify the wiring actually works, because a config that *looks* valid can
-still be broken.
