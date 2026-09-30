@@ -55,10 +55,13 @@ Each then extracts the JavaScript at the end of the file into a temp file and ru
 4. The JavaScript
 
 **Line endings are deliberately mixed**: CRLF for the batch block, LF for the sh
-part. `cmd.exe` reads batch files by byte offset and mis-seeks on a large LF-only
-file with nested blocks — it ends up running the sh block too. `sh` is the opposite:
-it does not strip `\r`, so CRLF would corrupt variable values. The
+part. `sh` does not strip `\r`, so CRLF would corrupt variable values; `cmd.exe`
+tracks its position in a batch file by byte, so CRLF is what it expects. The
 `.gitattributes` marks the file `binary` so git never rewrites it.
+
+**The batch block must stay pure ASCII.** Multi-byte UTF-8 characters in it make
+`cmd.exe` mis-seek and run the sh block too. All batch messages are therefore
+ASCII, and the language menu is the only place both languages appear.
 
 ### Security
 
@@ -173,11 +176,14 @@ file, theo thứ tự:
 3. Marker `#__PAYLOAD__`
 4. Toàn bộ JavaScript
 
-**Line ending cố ý trộn**: CRLF cho khối batch, LF cho phần sh. `cmd.exe` đọc file
-batch theo byte offset và tính sai dòng khi file LF thuần đủ lớn có khối lồng nhau —
-nó chạy lạc sang cả khối sh. `sh` thì ngược lại: không tự cắt `\r`, nên CRLF sẽ làm
-hỏng giá trị biến. `.gitattributes` đánh dấu file là `binary` để git không bao giờ
-ghi đè.
+**Line ending cố ý trộn**: CRLF cho khối batch, LF cho phần sh. `sh` không tự cắt
+`\r` nên CRLF sẽ làm hỏng giá trị biến; còn `cmd.exe` theo dõi vị trí trong file
+batch theo byte nên CRLF mới là dạng nó chờ đợi. `.gitattributes` đánh dấu file là
+`binary` để git không bao giờ ghi đè.
+
+**Khối batch phải thuần ASCII.** Ký tự UTF-8 nhiều byte trong đó làm `cmd.exe`
+tính sai vị trí và chạy lạc sang cả khối sh. Nên mọi thông báo trong batch đều là
+ASCII, và menu chọn ngôn ngữ là chỗ duy nhất có cả hai thứ tiếng.
 
 ### An toàn
 

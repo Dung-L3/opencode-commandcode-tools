@@ -244,33 +244,41 @@ exit "$rc"`;
 
 const brain = fs.readFileSync(SRC, "utf8");
 
-// TRỘN LINE ENDING — đây là điểm mấu chốt, không phải tuỳ tiện:
+// LINE ENDING HỖN HỢP — cố ý:
 //
-//   cmd.exe đọc file batch theo BYTE OFFSET. Với file LF thuần, khi file đủ
-//   lớn và có khối if lồng nhau, cmd tính sai dòng và chạy lạc sang cả khối sh
-//   phía sau (đã gặp thật). CRLF mới đọc đúng.
+//   Khối batch dùng CRLF. Dù đã xác minh bản LF hiện tại cũng chạy, CRLF mới là
+//   dạng cmd.exe được thiết kế để đọc (nó theo dõi vị trí theo byte), và đây là
+//   dạng đã chạy đúng khi mọi thứ khác đều hỏng — nên giữ cho chắc.
 //
-//   sh thì ngược lại: không tự cắt \r, nên CRLF sẽ làm hỏng giá trị biến.
+//   Phần sh dùng LF: sh không tự cắt \r, CRLF sẽ làm hỏng giá trị biến.
+//   sh bỏ qua toàn bộ khối batch qua heredoc nên CRLF bên trong vô hại.
 //
-//   Nên: khối batch + dòng kết BATCH_EOF dùng CRLF; phần sh và payload dùng LF.
-//   sh bỏ qua toàn bộ khối batch qua heredoc, nên CRLF bên trong vô hại.
-//   Dòng 1 và dòng kết đều CRLF nên delimiter khớp nhau (cả hai đều là
-//   "BATCH_EOF\r" với sh).
-const batchPart = [": << 'BATCH_EOF'", BATCH, "BATCH_EOF"].join("\r\n") + "\r\n";
+//   Dòng mở và dòng kết đều CRLF => với sh, delimiter là "BATCH_EOF\r" ở cả hai
+//   đầu nên vẫn khớp.
+//
+//   .gitattributes đánh dấu file là `binary` để git lưu nguyên byte.
+const BATCH_CRLF = BATCH.replace(/\r?\n/g, "\r\n");
+const batchPart = [": << 'BATCH_EOF'", BATCH_CRLF, "BATCH_EOF"].join("\r\n") + "\r\n";
 const shPart = [SH, "", MARKER, brain].join("\n").replace(/\r\n/g, "\n");
 const out = batchPart + shPart;
 
 fs.writeFileSync(OUT, out, "utf8");
 
-const body = out.slice(batchPart.length);
-const crlfInSh = (body.match(/\r\n/g) || []).length;
+const bytes = Buffer.from(out, "utf8");
+let crlf = 0, lfOnly = 0;
+for (let i = 0; i < bytes.length; i++) {
+  if (bytes[i] === 10) { if (i > 0 && bytes[i - 1] === 13) crlf++; else lfOnly++; }
+}
 const batchBlock = out.slice(0, batchPart.length);
-const nonAsciiInBatch = batchBlock.split("\n").filter((l) => /[^\x00-\x7F]/.test(l)).length;
+const nonAsciiInBatch = batchBlock.split("\n").filter((l) => /[^\x00-\x7F]/.test(l.replace(/\r$/, ""))).length;
 const markerLines = (out.match(new RegExp(`^${MARKER}$`, "gm")) || []).length;
+const shBody = out.slice(batchPart.length);
+const crlfInSh = (shBody.match(/\r\n/g) || []).length;
 
 console.log(`Đã tạo: ${OUT}`);
-console.log(`  kích thước      : ${fs.statSync(OUT).size} bytes`);
-console.log(`  dòng            : ${out.split("\n").length}`);
-console.log(`  CRLF trong sh   : ${crlfInSh} (phải là 0)`);
+console.log(`  kích thước            : ${bytes.length} bytes`);
+console.log(`  CRLF                  : ${crlf} (khối batch)`);
+console.log(`  LF đơn                : ${lfOnly} (phần sh + payload)`);
+console.log(`  CRLF trong phần sh    : ${crlfInSh} (phải là 0)`);
 console.log(`  dòng batch ngoài ASCII: ${nonAsciiInBatch} (phải là 0)`);
-console.log(`  marker          : ${markerLines} lần (phải là 1)`);
+console.log(`  marker                : ${markerLines} lần (phải là 1)`);
