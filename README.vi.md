@@ -1,101 +1,164 @@
+<div align="center">
+
 # opencode-commandcode-tools
+
+**Nối [Command Code](https://commandcode.ai) vào [OpenCode](https://opencode.ai) — bằng một file.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](#c%C3%A1ch-d%C3%B9ng)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](#y%C3%AAu-c%E1%BA%A7u)
+[![Tests](https://img.shields.io/badge/tests-29%20passing-success)](dev/setup-commandcode.test.mjs)
 
 **[English](README.md)** · **Tiếng Việt**
 
-Một file để nối **Command Code** thành provider cho **OpenCode**.
+</div>
 
 ---
 
-## Đây là gì
+Gửi **một file** sang bất kỳ máy nào. Nó tự dò những gì đã cài, cấu hình Command Code
+thành provider cho OpenCode, rồi kiểm chứng bằng một request thật.
 
-Bộ cài một file, cấu hình Command Code thành provider cho OpenCode. Nó lấy danh sách
-model từ API, ghi cấu hình provider, và **giữ nguyên mọi thứ khác** trong config
-OpenCode của bạn (plugins, MCP servers, agents).
+Không cần `git clone`. Không phụ thuộc gì. Không có API key trong file.
 
-## Dùng
+## Bắt đầu nhanh
 
-Gửi **một file** — `Cai-CommandCode.cmd` — sang máy đích. Không cần gì kèm theo.
+**1.** Tải [`Cai-CommandCode.cmd`](Cai-CommandCode.cmd)
 
-| Hệ điều hành | Cách chạy |
+**2.** Chạy
+
+| Hệ điều hành | Cách |
 |---|---|
 | **Windows** | Nhấp đúp |
 | **Linux / macOS** | `sh Cai-CommandCode.cmd` |
 
-Việc đầu tiên nó hỏi là ngôn ngữ: **English hoặc Tiếng Việt**.
+**3.** Chọn ngôn ngữ, dán API key, xong.
 
-Nếu máy chưa có Node.js, nó hỏi trước khi cài. Nếu cài thất bại, nó in hướng dẫn
-cài thủ công kèm link tải.
+> Lấy key tại [commandcode.ai/settings/keys](https://commandcode.ai/settings/keys).
+> Sau đó mở lại OpenCode và gõ `/models` để chọn model `cmd/...`.
 
-Xong rồi thì mở lại OpenCode và gõ `/models` để chọn model `cmd/...`.
-
-## Một file, hai hệ điều hành
-
-File này là **polyglot** — cùng một file, mỗi hệ điều hành đọc một phần khác nhau.
-
-Dòng đầu tiên:
+## Chạy trông như thế nào
 
 ```
-: << 'BATCH_EOF'
+  ==================================================
+   Chon ngon ngu  /  Choose language
+  ==================================================
+
+     [1] English
+     [2] Tieng Viet (Vietnamese)
+
+Chon / Choose: 2
+
+==================================================
+   COMMAND CODE  →  OPENCODE
+==================================================
+
+[1/6] Dò môi trường
+      ✓ Node v26.7.0 đã có.
+      ✓ OpenCode opencode v2.0.20
+      ✓ Command Code 1.69.0 (lệnh: cmdc)
+
+[2/6] Kiểm tra OpenCode đã nối với Command Code chưa
+      ! config chưa có providers.cmd.
+      Trạng thái: chưa cấu hình
+
+[3/6] Xác định việc cần làm
+      Cần cấu hình provider cho OpenCode.
+...
+[6/6] Cấu hình
+      ✓ CLI: đã ghi key.
+      ✓ Backup: opencode.json.bak-2026-09-30T02-14-08
+      ✓ providers.cmd đã tạo → 74 model.
+      ✓ providers.cmd-claude → 10 model.
+
+Kiểm chứng
+      ✓ Key khớp ở cả 2 provider.
+      ✓ providers.cmd: 74 model.
+      ✓ Giữ nguyên: plugins, mcp, agents.
+      Đang thử thật một request qua OpenCode...
+      ✓ Thử thật thành công (cmd/deepseek/deepseek-v4-flash)
+
+==================================================
+   XONG — ĐÃ NỐI XONG
+==================================================
 ```
 
-- **sh** hiểu là heredoc rỗng → bỏ qua toàn bộ khối batch, chạy tiếp phần sh
-- **cmd** hiểu là label → bỏ qua dòng đó, chạy thẳng khối batch bên dưới
+## Cách hoạt động
 
-Cả hai sau đó tách phần JavaScript ở cuối file ra file tạm rồi gọi `node`. Cấu trúc
-file, theo thứ tự:
+```mermaid
+flowchart TD
+    A[Dò môi trường] --> B{Đã có Node?}
+    B -- chưa --> B1[Hỏi, rồi cài] --> B
+    B -- rồi --> C{OpenCode +<br/>Command Code?}
+    C -- chưa --> C1[Hỏi, rồi cài] --> C
+    C -- rồi --> D{Đã nối với<br/>Command Code?}
+    D -- rồi --> D1[Hỏi có đổi key không]
+    D -- chưa --> E[Đòi API key]
+    E --> F{Key hợp lệ?}
+    F -- không --> F1[Dừng. Không ghi gì.]
+    F -- có --> G[Ghi config nguyên tử<br/>+ backup kèm timestamp]
+    G --> H[Kiểm chứng bằng request thật]
+```
 
-1. Bootstrap Windows (batch)
-2. Bootstrap Linux/macOS (sh)
-3. Marker `#__PAYLOAD__`
-4. Toàn bộ JavaScript
+**Vài lựa chọn thiết kế**
 
-**Line ending cố ý trộn**: CRLF cho khối batch, LF cho phần sh. `sh` không tự cắt
-`\r` nên CRLF sẽ làm hỏng giá trị biến; còn `cmd.exe` theo dõi vị trí trong file
-batch theo byte nên CRLF mới là dạng nó chờ đợi. `.gitattributes` đánh dấu file là
-`binary` để git không bao giờ ghi đè.
-
-**Khối batch phải thuần ASCII.** Ký tự UTF-8 nhiều byte trong đó làm `cmd.exe`
-tính sai vị trí và chạy lạc sang cả khối sh. Nên mọi thông báo trong batch đều là
-ASCII, và menu chọn ngôn ngữ là chỗ duy nhất có cả hai thứ tiếng.
+| Lựa chọn | Vì sao |
+|---|---|
+| Hỏi chính OpenCode xem config ở đâu | Không hardcode đường dẫn — chạy được trên mọi máy |
+| Kiểm tra key *trước khi* ghi | Gõ nhầm không bao giờ phá được setup đang chạy |
+| Chỉ đổi key nếu provider đã tồn tại | Idempotent — chạy lại thoải mái |
+| Chạy request thật ở bước cuối | Config *trông* hợp lệ vẫn có thể hỏng thật |
+| Ghi nguyên tử (file tạm → rename) | Không bao giờ để lại config dở dang |
 
 ## An toàn
 
-**Trong file không có API key.** Nó chỉ *ghi* key vào config cục bộ, không bao giờ
-*chứa* key. Key được lưu vào:
+**Trong file không có API key.** Nó chỉ *ghi* key vào config cục bộ.
 
-- `~/.commandcode/auth.json` — cho Command Code CLI
-- `~/.config/opencode/opencode.json` → `providers.cmd.settings.apiKey` — cho OpenCode
+| Nơi lưu | Cho |
+|---|---|
+| `~/.commandcode/auth.json` | Command Code CLI |
+| `~/.config/opencode/opencode.json` → `providers.cmd.settings.apiKey` | OpenCode |
 
-Trước khi ghi bất cứ thứ gì, công cụ **kiểm tra key với máy chủ Command Code**. Key
-sai thì dừng ngay và không ghi gì — không có tình huống tự khoá mình khỏi setup đang
-chạy tốt.
+Key được kiểm tra với máy chủ Command Code **trước khi** ghi bất cứ thứ gì. Key sai
+thì dừng lại, không thay đổi gì cả.
 
-## Công cụ làm gì
+## Yêu cầu
 
-1. Dò môi trường: Node, OpenCode, Command Code
-2. Tìm thư mục config bằng cách **hỏi chính OpenCode** (`opencode debug paths`) —
-   không hardcode đường dẫn. Dự phòng: `$XDG_CONFIG_HOME` → `~/.config`
-3. Kiểm tra xem OpenCode đã nối với Command Code chưa:
-   - chưa có provider → cấu hình
-   - có provider nhưng key hỏng → đòi key mới
-   - đã nối sẵn sàng → hỏi có muốn đổi key không
-4. Thiếu OpenCode / Command Code → in lệnh, hỏi xác nhận, rồi cài
-5. Lấy danh sách model từ API, chia theo route:
-   - `/chat/completions` + `/responses` → provider `cmd` (openai-compatible)
-   - `/messages` → provider `cmd-claude` (anthropic)
-6. Ghi config **nguyên tử** (file tạm rồi rename), có backup kèm timestamp
-7. Kiểm chứng bằng cách chạy thật một request qua OpenCode
+- **Node.js ≥ 18** — tự cài nếu thiếu (có hỏi trước)
+- **OpenCode** và **Command Code CLI** — tự cài nếu thiếu
+- **Mạng** — để kiểm tra key và lấy danh sách model
 
-Bước 7 quan trọng: config trông hợp lệ vẫn có thể hỏng thật. Chỉ request thật mới bắt
-được.
+## Cách dùng
 
-Idempotent: nếu provider `cmd` đã tồn tại thì **chỉ đổi key**, giữ nguyên danh sách
-model.
+### Cứ chạy lại
+
+Chạy lại an toàn. Nếu provider đã tồn tại thì nó hỏi có muốn đổi key không; danh sách
+model giữ nguyên.
+
+### Windows
+
+Nhấp đúp `Cai-CommandCode.cmd`, hoặc:
+
+```powershell
+.\Cai-CommandCode.cmd
+```
+
+### Linux / macOS
+
+```bash
+sh Cai-CommandCode.cmd
+```
+
+### Không tương tác
+
+Pipe sẵn lựa chọn ngôn ngữ và key:
+
+```bash
+printf '2\nkey_cua_ban\n' | sh Cai-CommandCode.cmd
+```
 
 ## Phát triển
 
-Nguồn nằm trong `dev/`. File `Cai-CommandCode.cmd` ở gốc là **file sinh ra**, không
-sửa tay.
+`Cai-CommandCode.cmd` là **file sinh ra**. Sửa nguồn trong `dev/`, đừng sửa file output.
 
 ```bash
 cd dev
@@ -103,18 +166,69 @@ node --test setup-commandcode.test.mjs    # 29 test
 node build-single-file.mjs                # sinh lại ../Cai-CommandCode.cmd
 ```
 
-Sửa logic trong `dev/setup-commandcode.mjs`, rồi chạy `build-single-file.mjs` để sinh
-lại file polyglot. Không chạy build thì thay đổi không vào file phát hành.
+Quên bước build nghĩa là thay đổi của bạn không bao giờ tới file phát hành — build
+script còn kiểm tra các ràng buộc bên dưới và báo lỗi ngay nếu chúng vỡ.
 
-Bản dịch nằm trong object `M` ở đầu `setup-commandcode.mjs` — cả `en` và `vi` phải có
-đủ cùng số khoá.
+<details>
+<summary><b>Vì sao một file chạy được trên hai hệ điều hành</b></summary>
+
+<br>
+
+File này là **polyglot**. Dòng đầu tiên:
+
+```
+: << 'BATCH_EOF'
+```
+
+- **sh** hiểu là heredoc rỗng → bỏ qua toàn bộ khối batch
+- **cmd** hiểu là label → bỏ qua dòng đó, chạy thẳng khối batch
+
+Cả hai sau đó tách phần JavaScript ở cuối ra file tạm rồi gọi `node`. Cấu trúc file,
+theo thứ tự: bootstrap batch, bootstrap sh, marker `#__PAYLOAD__`, rồi JavaScript.
+
+</details>
+
+<details>
+<summary><b>Vì sao line ending bị trộn, và vì sao khối batch phải thuần ASCII</b></summary>
+
+<br>
+
+**CRLF cho khối batch, LF cho phần sh.**
+
+`sh` không tự cắt `\r`, nên CRLF sẽ làm hỏng mọi giá trị biến. Còn `cmd.exe` theo dõi
+vị trí trong file batch theo byte, nên CRLF mới là dạng nó chờ đợi. `.gitattributes`
+đánh dấu file là `binary` để git không bao giờ ghi đè — thiếu bước đó, một bản clone
+trên Windows sẽ phá nửa phần sh.
+
+**Khối batch phải thuần ASCII.**
+
+Chỗ này từng làm tôi vấp nặng. Khi có ký tự UTF-8 nhiều byte trong khối batch,
+`cmd.exe` tính sai vị trí đọc và bắt đầu **chạy luôn cả khối sh**, sinh ra rác kiểu
+`'Tiếng' is not recognized`. Nên mọi thông báo trong batch đều là ASCII, và menu chọn
+ngôn ngữ là chỗ duy nhất có cả hai thứ tiếng.
+
+</details>
+
+<details>
+<summary><b>Bản dịch</b></summary>
+
+<br>
+
+Cả hai thứ tiếng nằm trong object `M` ở đầu `dev/setup-commandcode.mjs`. `en` và `vi`
+phải luôn có đủ cùng số khoá — có một test canh việc này.
+
+</details>
 
 ## Giới hạn đã biết
 
-- **Chưa test trên macOS.** macOS dùng bash 3.2 và `sed`/`awk`/`tail` bản BSD, khác GNU.
-- **Nhánh "cài Node thành công rồi chạy tiếp" chưa từng chạy thật.** WSL1 không chạy
-  nổi Node ≥18 (`Exec format error`) — hạn chế của WSL1, không phải lỗi công cụ này.
+| | |
+|---|---|
+| **macOS** | Chưa test. macOS dùng bash 3.2 và `sed`/`awk`/`tail` bản BSD, khác GNU. |
+| **Cài Node trên máy trắng** | Nhánh "cài thành công rồi chạy tiếp" chưa từng chạy thật. WSL1 không chạy nổi Node ≥18 (`Exec format error`), chặn việc test. Hạn chế của WSL1, không phải lỗi công cụ này. |
+
+Mọi nhánh khác đều đã chạy thật: cả hai hệ điều hành, cả hai ngôn ngữ, nhập key ẩn
+trên console thật, nhánh đổi key, và một bản clone mới từ GitHub.
 
 ## Giấy phép
 
-Chưa chọn giấy phép. Mọi quyền được bảo lưu.
+[MIT](LICENSE) © 2026 Dung-L3
