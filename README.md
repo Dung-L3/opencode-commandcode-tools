@@ -220,16 +220,6 @@ Both languages live in the `M` object at the top of `dev/setup-commandcode.mjs`.
 
 </details>
 
-## Known limitations
-
-| | |
-|---|---|
-| **macOS** | Not tested. It ships bash 3.2 and BSD `sed`/`awk`/`tail`, which differ from GNU. |
-| **Fresh-machine Node install** | The "installed successfully, now continue" path has never actually run. WSL1 cannot execute Node ≥18 (`Exec format error`), which blocks testing it. A WSL1 limitation, not a bug in this tool. |
-
-Every other path has been run for real: both OS branches, both languages, the
-masked key prompt on a real console, the migration path, and a fresh clone.
-
 ## License
 
 [MIT](LICENSE) © 2026 Dung-L3

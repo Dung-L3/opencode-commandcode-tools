@@ -219,16 +219,6 @@ phải luôn có đủ cùng số khoá — có một test canh việc này.
 
 </details>
 
-## Giới hạn đã biết
-
-| | |
-|---|---|
-| **macOS** | Chưa test. macOS dùng bash 3.2 và `sed`/`awk`/`tail` bản BSD, khác GNU. |
-| **Cài Node trên máy trắng** | Nhánh "cài thành công rồi chạy tiếp" chưa từng chạy thật. WSL1 không chạy nổi Node ≥18 (`Exec format error`), chặn việc test. Hạn chế của WSL1, không phải lỗi công cụ này. |
-
-Mọi nhánh khác đều đã chạy thật: cả hai hệ điều hành, cả hai ngôn ngữ, nhập key ẩn
-trên console thật, nhánh đổi key, và một bản clone mới từ GitHub.
-
 ## Giấy phép
 
 [MIT](LICENSE) © 2026 Dung-L3
