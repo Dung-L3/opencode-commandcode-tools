@@ -21,6 +21,26 @@ thành provider cho OpenCode, rồi kiểm chứng bằng một request thật.
 
 Không cần `git clone`. Không phụ thuộc gì. Không có API key trong file.
 
+## Các lệnh
+
+Cùng một file làm được nhiều việc — truyền thêm lệnh con:
+
+| Lệnh | Việc |
+|---|---|
+| *(không có)* | Nối Command Code vào OpenCode |
+| `doctor` | Kiểm tra sức khoẻ toàn bộ stack (chỉ đọc) |
+| `backup` | Xem, phục hồi, dọn backup config |
+| `uninstall` | Gỡ Command Code khỏi OpenCode (hoàn tác cài đặt) |
+| `probe` | Xem gói của bạn thật sự dùng được model nào |
+| `models` | Xem hoặc chọn model mặc định |
+
+```bash
+Cai-CommandCode.cmd doctor          # Windows
+sh Cai-CommandCode.cmd doctor       # Linux / macOS
+```
+
+Cờ chung: `--lang en|vi`, `-h/--help`, `-v/--version`.
+
 ## Bắt đầu nhanh
 
 **1.** Tải **[Cai-CommandCode.cmd](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest/download/Cai-CommandCode.cmd)**
@@ -164,11 +184,22 @@ printf '2\nkey_cua_ban\n' | sh Cai-CommandCode.cmd
 ```bash
 cd dev
 node --test setup-commandcode.test.mjs    # 29 test
+node bundle.mjs                           # gộp module + kiểm tra cú pháp
 node build-single-file.mjs                # sinh lại ../Cai-CommandCode.cmd
 ```
 
-Quên bước build nghĩa là thay đổi của bạn không bao giờ tới file phát hành — build
-script còn kiểm tra các ràng buộc bên dưới và báo lỗi ngay nếu chúng vỡ.
+Nguồn được chia thành các module trong `dev/lib/`, vì file phát hành chỉ được chứa
+**một** đoạn JavaScript duy nhất (nó chạy từ một file tạm nằm một mình, nên import
+tương đối không giải được). `bundle.mjs` gộp chúng lại, bỏ `import`/`export`, và
+**báo lỗi ngay** nếu hai module khai báo cùng một tên ở cấp cao nhất — gộp phẳng
+không có cách nào khác để chặn việc đó.
+
+Thứ tự quan trọng và nằm ở `ORDER` trong `bundle.mjs`: `lib/shared.mjs` đầu,
+`main.mjs` cuối.
+
+Mỗi module lệnh tự sở hữu chuỗi của mình và đăng ký bằng `registerMessages(en, vi)`
+— khoá có tiền tố theo lệnh (`install.`, `doctor.`, …). Có test canh việc hai thứ
+tiếng luôn khớp số khoá và khớp cả placeholder.
 
 <details>
 <summary><b>Vì sao một file chạy được trên hai hệ điều hành</b></summary>

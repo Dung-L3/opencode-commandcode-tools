@@ -20,6 +20,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildPayload } from "./bundle.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(HERE, "setup-commandcode.mjs");
@@ -142,7 +143,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node "%PAYLOAD%"
+node "%PAYLOAD%" %*
 set "RC=%errorlevel%"
 del "%PAYLOAD%" >nul 2>nul
 echo.
@@ -237,12 +238,12 @@ if [ -z "$LINE" ]; then
 fi
 awk -v m="${MARKER}" 'found{print} $0==m{found=1}' "$SELF" > "$PAYLOAD"
 
-node "$PAYLOAD"
+node "$PAYLOAD" "$@"
 rc=$?
 rm -f "$PAYLOAD"
 exit "$rc"`;
 
-const brain = fs.readFileSync(SRC, "utf8");
+const brain = buildPayload();
 
 // LINE ENDING HỖN HỢP — cố ý:
 //

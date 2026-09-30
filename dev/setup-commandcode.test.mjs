@@ -20,7 +20,18 @@ import {
   setLang,
   getLang,
   detectLang,
-} from "./setup-commandcode.mjs";
+  messageKeys,
+} from "./lib/shared.mjs";
+
+// Nạp mọi module lệnh NGAY ĐẦU file: chúng đăng ký chuỗi ở cấp cao nhất, và
+// các test i18n bên dưới cần bảng chuỗi đã đầy đủ.
+import "./lib/install.mjs";
+import "./lib/doctor.mjs";
+import "./lib/backup.mjs";
+import "./lib/uninstall.mjs";
+import "./lib/probe.mjs";
+import "./lib/models.mjs";
+import "./main.mjs";
 
 // ---------- i18n ----------
 test("detectLang: CMDCODE_LANG thang moi thu", () => {
@@ -39,17 +50,17 @@ test("detectLang: khong co env thi theo locale", () => {
 
 test("t: doi ngon ngu thi doi chu", () => {
   setLang("en");
-  assert.match(t("done"), /DONE/);
+  assert.match(t("install.done"), /DONE/);
   setLang("vi");
-  assert.match(t("done"), /XONG/);
+  assert.match(t("install.done"), /XONG/);
   assert.equal(getLang(), "vi");
 });
 
 test("t: thay placeholder", () => {
   setLang("en");
-  assert.match(t("keyValid", { n: 42 }), /42/);
+  assert.match(t("install.keyValid", { n: 42 }), /42/);
   setLang("vi");
-  assert.match(t("providerCreated", { n: 7 }), /7/);
+  assert.match(t("install.providerCreated", { n: 7 }), /7/);
 });
 
 test("t: khoa la thi tra ve chinh khoa do, khong crash", () => {
@@ -63,20 +74,40 @@ test("setLang: gia tri la thi mac dinh ve en", () => {
   setLang("vi");
 });
 
-test("MOI khoa deu co du ca hai thu tieng", async () => {
-  const mod = await import("./setup-commandcode.mjs");
-  // Lay khoa bang cach do chuoi: dung bang cach goi t voi mot khoa gia
-  const keysEn = new Set(), keysVi = new Set();
-  const src = mod.getLang;
-  // So sanh truc tiep qua bang dich vu (khong export) => do gian tiep:
-  // dat tung ngon ngu roi kiem tra vai khoa dai dien khong bi ro ri.
-  setLang("en");
-  const enSamples = ["langTitle", "step1", "done", "keyValid", "e2eOk"].map((k) => t(k, { n: 1, v: "x", m: "y", f: "z", p: "q", s: "r", url: "u", fp: "w", src: "t", e: "e", what: "o", cmd: "c", list: "l" }));
+test("MOI khoa deu co du ca hai thu tieng (khong sot ban dich)", async () => {
+  // Nạp hết module lệnh để chúng đăng ký chuỗi.
+  await Promise.all([
+    import("./lib/shared.mjs"),
+    import("./lib/install.mjs"),
+    import("./lib/doctor.mjs"),
+    import("./lib/backup.mjs"),
+    import("./lib/uninstall.mjs"),
+    import("./lib/probe.mjs"),
+    import("./lib/models.mjs"),
+    import("./main.mjs"),
+  ]);
+  const { en, vi } = messageKeys();
+  const onlyEn = en.filter((k) => !vi.includes(k));
+  const onlyVi = vi.filter((k) => !en.includes(k));
+  assert.deepEqual(onlyEn, [], `khoá chỉ có tiếng Anh: ${onlyEn.join(", ")}`);
+  assert.deepEqual(onlyVi, [], `khoá chỉ có tiếng Việt: ${onlyVi.join(", ")}`);
+  assert.ok(en.length > 100, `quá ít khoá (${en.length}) — có module chưa đăng ký?`);
+
+  // Placeholder phải khớp giữa hai bản dịch. Bản dịch quên một {biến} là lỗi
+  // thật, và chỉ cách này mới bắt được.
+  const ph = (s) => (s.match(/\{(\w+)\}/g) || []).sort().join(",");
   setLang("vi");
-  const viSamples = ["langTitle", "step1", "done", "keyValid", "e2eOk"].map((k) => t(k, { n: 1, v: "x", m: "y", f: "z", p: "q", s: "r", url: "u", fp: "w", src: "t", e: "e", what: "o", cmd: "c", list: "l" }));
-  assert.equal(enSamples.length, viSamples.length);
-  for (const s of enSamples) assert.ok(s && !s.includes("{"), `chuoi tieng Anh con placeholder: ${s}`);
-  for (const s of viSamples) assert.ok(s && !s.includes("{"), `chuoi tieng Viet con placeholder: ${s}`);
+  const viText = {};
+  for (const k of en) viText[k] = t(k);
+  setLang("en");
+  for (const k of en) {
+    assert.equal(
+      ph(t(k)),
+      ph(viText[k]),
+      `khoá ${k}: placeholder lệch giữa tiếng Anh và tiếng Việt`
+    );
+  }
+  setLang("vi");
 });
 
 

@@ -21,6 +21,26 @@ Code as an OpenCode provider, and verifies the result with a real request.
 
 No `git clone`. No dependencies. No API key inside the file.
 
+## Commands
+
+The same file does more than install — pass a subcommand:
+
+| Command | What it does |
+|---|---|
+| *(none)* | Wire Command Code into OpenCode |
+| `doctor` | Read-only health check of the whole stack |
+| `backup` | List, restore or prune config backups |
+| `uninstall` | Remove Command Code from OpenCode (undo install) |
+| `probe` | Show which models your plan can actually use |
+| `models` | Inspect or choose the default model |
+
+```bash
+Cai-CommandCode.cmd doctor          # Windows
+sh Cai-CommandCode.cmd doctor       # Linux / macOS
+```
+
+Global flags: `--lang en|vi`, `-h/--help`, `-v/--version`.
+
 ## Quick start
 
 **1.** Download **[Cai-CommandCode.cmd](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest/download/Cai-CommandCode.cmd)**
@@ -164,11 +184,23 @@ printf '1\nyour_api_key_here\n' | sh Cai-CommandCode.cmd
 ```bash
 cd dev
 node --test setup-commandcode.test.mjs    # 29 tests
+node bundle.mjs                           # flatten modules + syntax check
 node build-single-file.mjs                # regenerate ../Cai-CommandCode.cmd
 ```
 
-Forgetting the build step means your change never reaches the released file —
-the build script also checks the invariants below and fails loudly if they break.
+The source is split into modules under `dev/lib/`, because the shipped file must
+contain a **single** JavaScript payload (it runs from a lone temp file, so relative
+imports cannot resolve). `bundle.mjs` flattens them, strips `import`/`export`, and
+**fails loudly** if two modules declare the same top-level name — flat bundling
+gives no other protection against that.
+
+Order matters and lives in `ORDER` in `bundle.mjs`: `lib/shared.mjs` first,
+`main.mjs` last.
+
+Each command module owns its own strings and registers them with
+`registerMessages(en, vi)` — keys are prefixed per command (`install.`, `doctor.`,
+…). A test asserts the two languages always have the same keys and the same
+placeholders.
 
 <details>
 <summary><b>How one file runs on two operating systems</b></summary>
