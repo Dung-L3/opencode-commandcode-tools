@@ -5,6 +5,7 @@
 **Nối [Command Code](https://commandcode.ai) vào [OpenCode](https://opencode.ai) — bằng một file.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Dung-L3/opencode-commandcode-tools)](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](#c%C3%A1ch-d%C3%B9ng)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](#y%C3%AAu-c%E1%BA%A7u)
 [![Tests](https://img.shields.io/badge/tests-29%20passing-success)](dev/setup-commandcode.test.mjs)
@@ -22,7 +23,7 @@ Không cần `git clone`. Không phụ thuộc gì. Không có API key trong fil
 
 ## Bắt đầu nhanh
 
-**1.** Tải [`Cai-CommandCode.cmd`](Cai-CommandCode.cmd)
+**1.** Tải **[Cai-CommandCode.cmd](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest/download/Cai-CommandCode.cmd)**
 
 **2.** Chạy
 

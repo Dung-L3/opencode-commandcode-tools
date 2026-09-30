@@ -5,6 +5,7 @@
 **Wire [Command Code](https://commandcode.ai) into [OpenCode](https://opencode.ai) — with one file.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Dung-L3/opencode-commandcode-tools)](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](#usage)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-29%20passing-success)](dev/setup-commandcode.test.mjs)
@@ -22,7 +23,7 @@ No `git clone`. No dependencies. No API key inside the file.
 
 ## Quick start
 
-**1.** Download [`Cai-CommandCode.cmd`](Cai-CommandCode.cmd)
+**1.** Download **[Cai-CommandCode.cmd](https://github.com/Dung-L3/opencode-commandcode-tools/releases/latest/download/Cai-CommandCode.cmd)**
 
 **2.** Run it
 
